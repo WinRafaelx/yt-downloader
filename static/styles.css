@@ -195,6 +195,10 @@ button:disabled {
   font-weight: 800;
 }
 
+.download-status [data-status-text] {
+  flex: 1;
+}
+
 .download-status[hidden] {
   display: none;
 }
@@ -211,6 +215,11 @@ button:disabled {
   background: var(--danger-bg);
 }
 
+.status-percent {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .status-spinner {
   width: 18px;
   height: 18px;
@@ -224,6 +233,26 @@ button:disabled {
 .download-status[data-state="success"] .status-spinner,
 .download-status[data-state="error"] .status-spinner {
   display: none;
+}
+
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 139, 141, 0.14);
+}
+
+.progress-track[hidden] {
+  display: none;
+}
+
+.progress-track span {
+  width: 0%;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.25s ease;
 }
 
 @keyframes spin {

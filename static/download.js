@@ -3,11 +3,28 @@ const button = document.querySelector("[data-download-button]");
 const buttonText = document.querySelector("[data-button-text]");
 const statusPanel = document.querySelector("[data-download-status]");
 const statusText = document.querySelector("[data-status-text]");
+const statusPercent = document.querySelector("[data-status-percent]");
+const progressTrack = document.querySelector("[data-progress-track]");
+const progressBar = document.querySelector("[data-progress-bar]");
 
-function setStatus(state, message) {
+const pollDelay = 900;
+
+function setStatus(state, message, progress = null) {
   statusPanel.hidden = false;
   statusPanel.dataset.state = state;
   statusText.textContent = message;
+
+  if (Number.isFinite(progress)) {
+    const clamped = Math.max(0, Math.min(100, progress));
+    statusPercent.hidden = false;
+    statusPercent.textContent = `${clamped}%`;
+    progressTrack.hidden = false;
+    progressBar.style.width = `${clamped}%`;
+  } else {
+    statusPercent.hidden = true;
+    progressTrack.hidden = true;
+    progressBar.style.width = "0%";
+  }
 }
 
 function setBusy(isBusy, label = "Preparing...") {
@@ -15,30 +32,10 @@ function setBusy(isBusy, label = "Preparing...") {
   buttonText.textContent = isBusy ? label : "Download";
 }
 
-function filenameFromDisposition(disposition) {
-  if (!disposition) {
-    return "youtube-download";
-  }
-
-  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match) {
-    return decodeURIComponent(utf8Match[1].replaceAll("+", "%20"));
-  }
-
-  const asciiMatch = disposition.match(/filename="?([^"]+)"?/i);
-  return asciiMatch ? asciiMatch[1] : "youtube-download";
-}
-
-function saveBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+function delay(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 async function readError(response) {
@@ -51,35 +48,77 @@ async function readError(response) {
   return "Download failed. Please try again.";
 }
 
+async function createJob() {
+  const response = await fetch(form.dataset.jobUrl, {
+    method: "POST",
+    body: new FormData(form),
+    headers: {
+      "X-Requested-With": "fetch",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  return response.json();
+}
+
+async function fetchJob(jobId) {
+  const response = await fetch(`/jobs/${jobId}`, {
+    headers: {
+      "X-Requested-With": "fetch",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  return response.json();
+}
+
+async function waitForJob(jobId) {
+  while (true) {
+    const job = await fetchJob(jobId);
+    const progress = Number.isFinite(job.progress) ? job.progress : null;
+
+    if (job.status === "error") {
+      throw new Error(job.error || "Download failed. Please try again.");
+    }
+
+    if (job.status === "complete") {
+      setStatus("success", job.message || "Download complete.", 100);
+      return job;
+    }
+
+    setStatus("busy", job.message || "Downloading media...", progress);
+    await delay(pollDelay);
+  }
+}
+
+function downloadFile(url) {
+  const link = document.createElement("a");
+
+  link.href = url;
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  setBusy(true);
-  setStatus("busy", "Preparing download...");
+  setBusy(true, "Starting...");
+  setStatus("busy", "Starting download...", 0);
 
   try {
+    const job = await createJob();
     setBusy(true, "Downloading...");
-    setStatus("busy", "Downloading media...");
+    setStatus("busy", job.message || "Queued download...", job.progress || 0);
 
-    const response = await fetch(form.action, {
-      method: "POST",
-      body: new FormData(form),
-      headers: {
-        "X-Requested-With": "fetch",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(await readError(response));
-    }
-
-    setStatus("busy", "Saving file...");
-
-    const blob = await response.blob();
-    const filename = filenameFromDisposition(response.headers.get("content-disposition"));
-    saveBlob(blob, filename);
-
-    setStatus("success", "Download complete.");
+    const finishedJob = await waitForJob(job.id);
+    downloadFile(finishedJob.download_url);
   } catch (error) {
     setStatus("error", error.message || "Download failed. Please try again.");
   } finally {
