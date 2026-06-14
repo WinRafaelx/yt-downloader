@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Local YouTube Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel" aria-labelledby="page-title">
+        <div class="heading">
+          <p class="eyebrow">Local tool</p>
+          <h1 id="page-title">YouTube Downloader</h1>
+          <p class="subtitle">Paste a link, choose audio or video, then save the file to your computer.</p>
+        </div>
+
+        {% if error %}
+          <div class="error" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <form class="download-form" action="/download" method="post" data-download-form>
+          <label for="url">YouTube URL</label>
+          <input
+            id="url"
+            name="url"
+            type="url"
+            inputmode="url"
+            placeholder="https://www.youtube.com/watch?v=..."
+            value="{{ url or '' }}"
+            required
+          >
+
+          <fieldset>
+            <legend>Download format</legend>
+            <div class="format-grid">
+              <label class="format-option">
+                <input type="radio" name="format" value="mp3" {% if selected == "mp3" or not selected %}checked{% endif %}>
+                <span>
+                  <strong>MP3</strong>
+                  <small>Audio, compact file</small>
+                </span>
+              </label>
+
+              <label class="format-option">
+                <input type="radio" name="format" value="wav" {% if selected == "wav" %}checked{% endif %}>
+                <span>
+                  <strong>WAV</strong>
+                  <small>Audio, uncompressed</small>
+                </span>
+              </label>
+
+              <label class="format-option">
+                <input type="radio" name="format" value="mp4" {% if selected == "mp4" %}checked{% endif %}>
+                <span>
+                  <strong>MP4</strong>
+                  <small>Video file</small>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="download-status" data-download-status hidden aria-live="polite">
+            <span class="status-spinner" aria-hidden="true"></span>
+            <span data-status-text>Preparing download...</span>
+          </div>
+
+          <button type="submit" data-download-button>
+            <span class="button-icon" aria-hidden="true">↓</span>
+            <span data-button-text>Download</span>
+          </button>
+        </form>
+      </section>
+    </main>
+    <script src="{{ url_for('static', filename='download.js') }}"></script>
+  </body>
+</html>
